@@ -1,0 +1,15 @@
+fastapi[all]
+uvicorn[standard]
+pydantic
+pydantic-settings
+sqlalchemy[asyncio]
+asyncpg
+alembic
+pandas
+openpyxl
+slowapi
+python-multipart
+jinja2
+typer
+pytest
+pytest-asyncio
