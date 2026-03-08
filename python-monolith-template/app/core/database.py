@@ -4,6 +4,7 @@ from typing import Any, List, Optional
 from abc import ABC, abstractmethod
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import declarative_base
+from fastapi import Depends
 
 from app.config import settings
 
@@ -126,20 +127,24 @@ class SQLRepository(BaseRepository):
 
 
 # =================================================================
-# 5. DEPENDENCY INJECTION DO WSTRZYKIWANIA W ROUTERACH FastAPI[cite: 9]
+# 5. DEPENDENCY INJECTION DO WSTRZYKIWANIA W ROUTERACH FastAPI
 # =================================================================
+async def get_optional_db_session():
+    """Bezpieczne dependency, które zarządza cyklem życia sesji."""
+    if settings.USE_DB and AsyncSessionLocal:
+        async with AsyncSessionLocal() as session:
+            yield session
+    else:
+        yield None
+
 def get_repository(table_name: str, model: Any = None):
     """
     Zwraca odpowiednią klasę repozytorium na podstawie config.USE_DB.
-    Używane w FastAPI Depends().[cite: 9]
     """
-    async def _get_repo(session: AsyncSession = None): # session jest wstrzykiwane opcjonalnie
+    async def _get_repo(session = Depends(get_optional_db_session)):
         if settings.USE_DB:
             if not session:
-                # Jeśli używamy DB a sesji brak, ręcznie ją pobieramy
-                async for s in get_db_session():
-                    session = s
-                    break
+                raise Exception("Baza włączona (USE_DB=True), ale brak połączenia.")
             return SQLRepository(session, model)
         else:
             return CSVRepository(table_name)

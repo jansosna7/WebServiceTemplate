@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     ENABLE_LEDGER: bool = True
     ENABLE_FILES: bool = True
     ENABLE_SCRIPTS: bool = True
+    ENABLE_PRODUCTS: bool = True
     
     # Web & Admin[cite: 5]
     ENABLE_ADMIN_PANEL: bool = True
