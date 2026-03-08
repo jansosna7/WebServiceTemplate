@@ -1,0 +1,104 @@
+STWÓRZ TEMPLATE PYTHON WEB SERVICE MONOLIT MODUŁOWY V1.0
+
+Cel: uniwersalny szkielet usługi webowej w Pythonie, który jest modularny, konfigurowalny, gotowy do rozszerzania przez pluginy i przygotowany pod deployment dev/prod.
+
+WYMAGANIA OGÓLNE:
+1. Backend:
+   - Async (FastAPI)
+   - REST API
+   - Automatyczna walidacja schematów (Pydantic)
+   - Service layer (logika biznesowa)
+   - Repository layer dla DB
+   - Event system (eventy globalne i pluginowe)
+   - Pagination standard (page + limit)
+   - Rate limiting (per user i per IP via slowapi, limity konfigurowalne w config.py)
+   - Background tasks
+   - Pliki: tymczasowe i trwałe, opcjonalnie z metadanymi
+   - Standard response format i global error handler w zależności od ustawień configu
+   - Health check endpoint opcjonalny
+   - OpenAPI export z interaktywną dokumentacją /docs
+   - Capability registry (moduły i funkcjonalności włączone/wyłączone)
+   - CLI do generowania endpointów API i stron webowych
+   - Email / SMTP settings w configu
+   - Auth: JWT/OAuth2 via FastAPI dependencies (włączany przez config ENABLE_AUTH)
+
+2. Web UI:
+   - Frontend prosty HTML + CSS + JS w folderze web/
+   - Strona korzysta z API jako klient
+   - Auto panel admina: CRUD dla users/roles, wallet/transactions, files, pluginy, logi
+   - Realizacja panelu: Jinja2 templates + HTMX dla SPA-feel
+   - Endpointy web w kodzie (routes.py) + templates + static
+   - Generator web tworzy tylko UI dla endpointów wygenerowanych przez generator API
+
+3. Modularność:
+   - Moduły w folderze modules/
+   - Każdy moduł: routes.py, schemas.py, services.py, opcjonalnie templates/ i static/
+   - Pluginy ładowane dynamicznie z folderu plugins/
+   - Moduły mogą być włączane/wyłączane przez config
+
+4. Repozytorium i storage:
+   - Obsługa DB: SQLAlchemy Async + Alembic migrations
+   - Fallback: pandas do Excel/CSV (tylko read/write, brak relacji)
+   - Pliki: storage/temp/ i storage/permanent/
+   - Logging z możliwością konfiguracji formatu i lokalizacji
+   - Metrics endpoint i obsługa monitoringu
+
+5. Endpoint templates:
+   - 8 wariantów kombinacji request: body / file / script
+   - Twórca wybiera moduły do aktywacji i dopracowuje je ręcznie
+   - Generator API tworzy endpointy, schematy i skeleton service
+   - Generator web tworzy tylko odpowiadające UI + template + static
+
+6. Config (feature flags):
+   - Wszystkie funkcjonalności mogą być włączone/wyłączone w config.py
+   - Konfiguracja obejmuje: USE_DB, auth, roles, wallet, ledger, files, scripts, background tasks, rate limit, events, plugins, admin panel, metrics, health check, standard response, global error handler, pagination, SMTP/email, capability registry, limits, window, deployment options
+
+7. DB schema:
+   - Users + roles
+   - Wallet + transactions/ledger
+   - Files + metadata
+   - Event log
+   - Fallback do CSV/Excel jeśli USE_DB=False
+
+8. Architektura pipeline:
+   request → rate limit → auth → validation → service → repository → storage/db → response
+
+9. Testy:
+   - pytest
+   - testy dla endpointów API i web
+   - mock DB / fallback CSV dla testów
+
+10. CLI:
+    - create_endpoint (API)
+    - create_web_page (UI dla endpointów API)
+    - create_plugin (folder pluginu + skeleton)
+    - opcjonalnie admin page generator
+
+11. Deployment (opcjonalne przygotowanie):
+    - Docker Compose dla dev/prod (uvicorn, postgres, redis dla rate-limit i eventów)
+    - Gunicorn + Uvicorn workers dla prod
+    - Env vars dla configu
+    - Możliwość łatwej podmiany backendu DB / storage / SMTP
+
+12. Wersjonowanie API:
+   - /api/v1/... /api/v2/... w zależności od ustawień
+
+13. Specyfikacja generowanych endpointów:
+   - auth, user, wallet, files, scripts
+   - public vs auth required
+   - body / file / script combinations
+   - pagination w response
+   - optional standard response format i error handler
+
+CEL KOŃCOWY:
+Repozytorium, które pozwala twórcy w ciągu kilku minut stworzyć:
+- backend API + modularny service layer + repository layer,
+- opcjonalny web UI + admin panel SPA-feel,
+- pluginy i event system,
+- generator endpointów + generator UI dla endpointów,
+- pełną dokumentację OpenAPI,
+- konfigurowalny w jednym miejscu (config.py),
+- DB lub szybki prototyp na CSV/Excel,
+- logging, metrics, rate limiting, background tasks i SMTP/email,
+- przygotowany do łatwego przekształcenia w microservices w przyszłości,
+- deployment dev/prod przez Docker Compose lub Gunicorn+Uvicorn.
