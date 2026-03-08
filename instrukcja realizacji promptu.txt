@@ -1,125 +1,113 @@
-Faza 1: Fundamenty i Szkielet Projektu
+Krok 1: Inicjalizacja Repozytorium i Zależności
 
-    Inicjalizacja środowiska:
+Najpierw tworzysz fizyczną strukturę i blokujesz wersje bibliotek, aby szablon był stabilny.
 
-        Stwórz wirtualne środowisko (python -m venv venv).
+    Stwórz foldery:
+    W terminalu wykonaj:
+    Bash
 
-        Zainstaluj podstawowe pakiety: fastapi, uvicorn, pydantic, pydantic-settings.
+    mkdir -p python-monolith-template/app/{core,modules,plugins,web/static,web/templates}
+    mkdir -p python-monolith-template/{storage/temp,storage/permanent,tests}
+    cd python-monolith-template
+    touch app/__init__.py app/main.py app/config.py app/cli.py .env.example README.md docker-compose.yml
 
-    Struktura katalogów:
+    Przygotuj requirements.txt:
+    Twój szablon musi mieć jasno określone zależności. Utwórz plik requirements.txt:
+    Plaintext
 
-        Utwórz foldery główne: app/core/, app/modules/, app/plugins/, app/web/, storage/temp/, storage/permanent/, tests/.
+    fastapi[all]
+    uvicorn[standard]
+    pydantic
+    pydantic-settings
+    sqlalchemy[asyncio]
+    asyncpg
+    alembic
+    pandas
+    openpyxl
+    slowapi
+    jinja2
+    python-multipart
+    typer
+    pytest
+    pytest-asyncio
 
-    Centralna Konfiguracja (app/config.py):
+    (Przyszły dev wpisze po prostu pip install -r requirements.txt)
 
-        Użyj BaseSettings z Pydantic do zdefiniowania wszystkich flag (Feature Flags): USE_DB, ENABLE_AUTH, limity rate-limitera, konfigurację SMTP itp.
+Krok 2: Centralny Mózg (Config i Capability Registry)
 
-        Podepnij czytanie z pliku .env.
+Ten krok jest kluczowy. Twórca usługi musi móc włączać i wyłączać fragmenty kodu z poziomu .env.
 
-    Entrypoint (app/main.py):
+    Napisz app/config.py:
+    Zdefiniuj klasę Settings dziedziczącą po BaseSettings (z pydantic-settings). Dodaj tam wszystkie flagi z Twojej specyfikacji (np. USE_DB, ENABLE_AUTH, ENABLE_FILES, limity rate-limitera).
 
-        Zainicjalizuj instancję FastAPI.
+    Skonfiguruj .env.example:
+    Wpisz tam domyślne, bezpieczne wartości (np. USE_DB=False, co od razu wymusi użycie CSV do szybkiego startu).
 
-        Podepnij globalny Error Handler i formatowanie standardowej odpowiedzi (Standard Response), zależnie od ustawień w config.py.
+Krok 3: Generyczny Entrypoint (app/main.py)
 
-Faza 2: Warstwa Danych (Baza vs Fallback)
+Twój main.py nie może mieć na sztywno wpisanych routerów. Musi dynamicznie sprawdzać, co twórca wygenerował w folderze modules/.
 
-    Zależności bazy danych: Zainstaluj sqlalchemy, asyncpg, alembic, a dla fallbacku pandas i openpyxl.
+    Zainicjalizuj FastAPI i podepnij globalny Error Handler (zwracający błędy w Twoim standardowym formacie JSON).
 
-    Konfiguracja SQLAlchemy (app/core/database.py):
+    Napisz auto-loader modułów (Capability Registry):
+    Dodaj logikę w Pythonie, która iteruje po folderze app/modules/. Jeśli znajdzie tam podfolder (np. wallet), sprawdza w config.py, czy ENABLE_WALLET jest True. Jeśli tak, robi dynamiczny import routes.py i podpina go pod app.include_router().
 
-        Skonfiguruj asynchroniczny silnik bazy danych (np. PostgreSQL).
+Krok 4: Podwójny Silnik Bazy Danych (app/core/database.py)
 
-        Stwórz system sesji zależnych (dependency injection).
+To jedna z najciekawszych funkcji Twojego szablonu.
 
-    Implementacja Fallbacku CSV:
+    Przygotuj interfejs (Abstract Base Class):
+    Stwórz klasę bazową BaseRepository z metodami asynchronicznymi typu get, create, update, delete.
 
-        Napisz klasę CSVHandler, która implementuje interfejs podobny do repozytorium (z metodami read/write) operujący na plikach w folderze storage/.
+    Implementacja SQLAlchemy:
+    Napisz klasę SQLRepository, która inicjalizuje async_engine (Postgres) i realizuje te metody za pomocą sesji bazy danych.
 
-    Interfejs Repozytorium:
+    Implementacja Fallbacku (Pandas):
+    Napisz klasę CSVRepository, która realizuje te same metody, ale pod spodem wczytuje pliki .csv z folderu storage/permanent/ używając pandas i zapisuje je z powrotem. Brak relacji (zgodnie ze specyfikacją), ale idealne do prototypowania.
 
-        Stwórz abstrakcję, która w zależności od flagi USE_DB wstrzykuje do modułów asynchroniczną sesję SQLAlchemy lub obiekt CSVHandler.
+    Dependency Injection:
+    Napisz funkcję get_repository(), która w locie sprawdza settings.USE_DB i zwraca odpowiednią implementację.
 
-Faza 3: Middleware, Auth i System Eventów
+Krok 5: Generator Kodu CLI (app/cli.py)
 
-    Rate Limiting:
+Twórca nie powinien pisać boilerplate'u. To serce Twojego szablonu (Developer Experience).
 
-        Zainstaluj slowapi.
+    Użyj biblioteki Typer.
 
-        Podepnij middleware w main.py do ograniczania zapytań (np. per IP/User), korzystając z limitów z config.py.
+    Napisz komendę @cli.command() def create_module(name: str):.
 
-    System Autoryzacji (app/core/auth.py):
+    Skrypt ten ma tworzyć folder w app/modules/{name} i generować tam 4 pliki:
 
-        Zaimplementuj JWT (np. z użyciem PyJWT i passlib).
+        schemas.py (puste modele Pydantic dla 8 wariantów kombinacji requestów).
 
-        Stwórz dependency get_current_user dla FastAPI, które weryfikuje token.
+        repository.py (dziedziczące z Twojego core.database).
 
-    Event Bus (app/core/events.py):
+        services.py (pusta klasa z wstrzykniętym repo i Event Busem).
 
-        Zbuduj prosty system Pub/Sub (w pamięci za pomocą asyncio.Queue lub oparty na Redis, jeśli wymaga tego środowisko prod). Pozwoli to na bezstanową komunikację (np. moduł portfela emituje event o przelewie, moduł powiadomień go odbiera).
+        routes.py (podpięte endpointy FastAPI wywołujące service).
 
-Faza 4: Modularność i Capability Registry
+Krok 6: Event Bus i Middleware (app/core/events.py i app/core/middleware.py)
 
-    Architektura Modułu:
+    Event System: Zaimplementuj prosty EventBus oparty na słowniku (dict[str, list[Callable]]) i asyncio.create_task(). Pozwoli to twórcom pisać await event_bus.publish("user.created", data) w serwisach.
 
-        Stwórz przykładowy moduł w app/modules/auth/ (zawierający routes.py, services.py, schemas.py, repository.py).
+    Standard Response: Napisz klasę formatującą, która przechwytuje odpowiedź i pakuje ją w jednolity JSON (np. {"status": "ok", "data": {...}, "pagination": {...}}).
 
-        Zbuduj przepływ (Pipeline): Route (przyjmuje request i waliduje Pydantic) -> wywołuje Service (logika) -> korzysta z Repository (zapis/odczyt).
+Krok 7: Frontend i Admin Panel SPA-feel (app/web/)
 
-    Capability Registry (app/main.py):
+    W app/main.py podepnij serwowanie statyków i Jinja2Templates.
 
-        Napisz logikę, która przy starcie aplikacji odczytuje config.py i dynamicznie rejestruje (lub ignoruje) routery z folderu app/modules/ za pomocą app.include_router(). Zaimplementuj wersjonowanie (/api/v1/...).
+    W app/web/templates/layout.html załącz bibliotekę HTMX z CDN.
 
-Faza 5: Narzędzia Deweloperskie (CLI)
+    Przygotuj generyczne widoki (np. admin_users.html), gdzie tabele mają atrybuty hx-get="/api/v1/users" i aktualizują tylko fragmenty DOM, dając efekt SPA.
 
-    Generator Kodu (app/cli.py):
+Krok 8: Gotowość do Deploymentu
 
-        Zainstaluj bibliotekę typer.
+    Skonfiguruj docker-compose.yml tak, aby zawierał 3 serwisy:
 
-        Zaimplementuj komendę create_endpoint, która wygeneruje 8 wariantów endpointów (body/file/script), schematy Pydantic oraz szkielet serwisu w odpowiednim folderze modułu.
+        api (Twoja aplikacja na uvicorn/gunicorn).
 
-        Zaimplementuj komendę create_plugin oraz create_web_page.
+        db (PostgreSQL - uruchamiany tylko gdy zmienna USE_DB=True).
 
-Faza 6: Frontend i Panel Administracyjny
+        redis (Przygotowany pod slowapi rate limiter na produkcję).
 
-    Szablony i Statyki:
-
-        Skonfiguruj w FastAPI serwowanie plików statycznych z app/web/static/.
-
-        Podepnij renderowanie szablonów Jinja2 z folderu app/web/templates/.
-
-    Panel HTMX:
-
-        Stwórz główny układ panelu admina (layout.html).
-
-        Zbuduj endpointy w app/web/routes.py, które zwracają fragmenty HTML (np. tabele z listą użytkowników, historię logów).
-
-        Oznacz przyciski i formularze atrybutami HTMX (hx-get, hx-post, hx-target), aby panel działał jak SPA, ale logikę i renderowanie zachował na backendzie.
-
-Faza 7: Pluginy, Pliki i Taski w tle
-
-    Dynamiczne Pluginy (app/plugins/):
-
-        Napisz mechanizm (np. z użyciem importlib), który przy starcie skanuje folder plugins/, ładuje moduły Pythona i podłącza ich routery lub subskrybuje je pod Event Bus, pod warunkiem, że są aktywne w konfiguracji.
-
-    Zarządzanie Plikami:
-
-        Dodaj logikę do przenoszenia plików z storage/temp/ (gdzie trafiają podczas walidacji) do storage/permanent/ po zatwierdzeniu przez serwis.
-
-    Background Tasks:
-
-        Wykorzystaj wbudowane w FastAPI BackgroundTasks (lub Celery dla środowiska PROD) do obsługi zadań asynchronicznych (np. wysyłka maili konfigurowanych via SMTP).
-
-Faza 8: Testy i Wdrożenie (Deployment)
-
-    Testy (Pytest):
-
-        Skonfiguruj pytest z pytest-asyncio.
-
-        Napisz mocki dla bazy danych lub wymuś w środowisku testowym przełączenie na USE_DB=False (użycie wbudowanego fallbacku CSV).
-
-    Dockerizacja:
-
-        Stwórz plik Dockerfile wykorzystujący serwer Uvicorn i menedżera procesów Gunicorn.
-
-        Stwórz docker-compose.yml, który podniesie aplikację, bazę PostgreSQL i ewentualnie instancję Redis do rate-limitera.
+    Napisz instrukcję README.md w stylu "Jak zbudować własną usługę w 5 minut korzystając z tego monolitu".
