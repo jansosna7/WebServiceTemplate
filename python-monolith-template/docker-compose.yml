@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  api:
+    build: .
+    container_name: monolith_api
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    depends_on:
+      - redis
+    # Odkomentuj poniższe, jeśli używasz bazy SQL
+    #   - db
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: monolith_redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+  # Odkomentuj sekcję bazy danych, gdy będziesz chciał przejść z CSV na PostgreSQL
+  # db:
+  #   image: postgres:15-alpine
+  #   container_name: monolith_db
+  #   environment:
+  #     POSTGRES_USER: user
+  #     POSTGRES_PASSWORD: password
+  #     POSTGRES_DB: monolith_db
+  #   ports:
+  #     - "5432:5432"
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #   restart: unless-stopped
+
+# volumes:
+#   postgres_data:
