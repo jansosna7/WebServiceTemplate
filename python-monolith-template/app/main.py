@@ -3,7 +3,12 @@ import importlib
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 from app.config import settings
+from app.core.middleware import StandardResponseMiddleware
+from app.config import settings
+from app.web.routes import admin_router
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -11,6 +16,9 @@ app = FastAPI(
     docs_url="/docs",
     version="1.0.0"
 )
+
+if settings.ENABLE_STANDARD_RESPONSE:
+    app.add_middleware(StandardResponseMiddleware)
 
 if settings.ENABLE_GLOBAL_ERROR_HANDLER:
     @app.exception_handler(Exception)
@@ -62,3 +70,8 @@ def load_modules():
                     print(f"[Capability Registry] Błąd ładowania modułu {module_name}: {e}")
 
 load_modules()
+
+app.mount("/static", StaticFiles(directory="app/web/static"), name="static")
+templates = Jinja2Templates(directory="app/web/templates")
+
+app.include_router(admin_router, prefix="/admin", tags=["Web Admin"])

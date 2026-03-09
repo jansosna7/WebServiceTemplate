@@ -1,0 +1,17 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<h2 class="text-2xl font-bold mb-4">Witaj w Panelu Admina</h2>
+<p class="text-gray-600 mb-6">Wszystkie systemy działają poprawnie.</p>
+
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+    <div class="p-4 bg-blue-50 border-l-4 border-blue-500">
+        <h3 class="font-bold">Status API</h3>
+        <p class="text-sm">Aktywne (v1)</p>
+    </div>
+    <div class="p-4 bg-green-50 border-l-4 border-green-500">
+        <h3 class="font-bold">Database</h3>
+        <p class="text-sm">{{ "SQLAlchemy" if use_db else "CSV Fallback" }}</p>
+    </div>
+</div>
+{% endblock %}
